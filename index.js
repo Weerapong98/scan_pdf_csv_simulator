@@ -67,8 +67,10 @@ async function nestedFolders(nodeId, folderList = []) {
 
 async function main() {
     try {
-        let test = await fs.readdir(`${process.env.STORAGE_PATH}PDF`)
-        console.log(test);
+        let pdf_files = await fs.readdir(`${process.env.STORAGE_PATH}PDF`)
+        console.log(pdf_files);
+        let csv_files = await fs.readdir(`${process.env.STORAGE_PATH}CSV`)
+        console.log(csv_files);
 
     } catch (error) {
         console.log("ERROR at main(): ", error);

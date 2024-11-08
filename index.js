@@ -71,12 +71,17 @@ async function uploadAlf(parentId, file, filename) {
     try {
         var form = new FormData()
         form.append('filedata', file, filename);
+        form.append('destination', `workspace://SpacesStore/${parentId}`)
+        form.append('overwrite', 'true')
 
         await axios({
             method: 'POST',
-            url: `${process.env.ALF_BASE_API}alfresco/versions/1/nodes/${parentId}/children`,
+            url: `${process.env.ALF_BASE_SERVICE}api/upload`,
             data: form,
             headers: form.getHeaders(),
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            auth
         });
     } catch (error) {
         console.log(`ERROR at uploadAlf(${parentId}, file, ${filename}): `, error);
@@ -85,7 +90,11 @@ async function uploadAlf(parentId, file, filename) {
 
 async function moveFile(from, to) {
     try {
-
+        await fs.rename(from, to, (error) => {
+            if (error) {
+                throw error
+            }
+        });
     } catch (error) {
         console.log(`ERROR at moveFile(${from}, ${to}): `, error);
     }
@@ -114,14 +123,18 @@ async function main() {
                         delete cloneXlData['Date Time']
                         delete cloneXlData['MD5 Code']
                         const folderList = Object.values(cloneXlData)
-                        console.log(folderList);
 
                         const folderId = await nestedFolders(process.env.ALF_BASE_NODE, folderList);
                         await uploadAlf(folderId, pdf_file, name);
+
+                        await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/SUCCESS/${name}`)
                     } else {
+                        console.log(`File MD5 hash does not match for: ${name}`);
+                        await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/ERROR/${name}`)
                     }
                 } else {
-
+                    console.log(`No matching CSV file for PDF: ${name}`);
+                    await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/ERROR/${name}`)
                 }
             }
         }

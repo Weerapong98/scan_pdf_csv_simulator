@@ -2,16 +2,18 @@ require('dotenv').config()
 const { promises: fs } = require('fs')
 const axios = require('axios')
 const FormData = require('form-data')
+const XLSX = require("xlsx");
+const md5File = require('md5-file')
+
+const auth = {
+    username: process.env.ALF_USERNAME,
+    password: process.env.ALF_PASSWORD
+}
 
 async function nestedFolders(nodeId, folderList = []) {
     try {
         var folderId = nodeId
         const maxItems = 1000
-
-        const auth = {
-            username: process.env.ALF_USERNAME,
-            password: process.env.ALF_PASSWORD
-        }
 
         // loop by folderList
         for await (const folderName of folderList) {
@@ -65,12 +67,64 @@ async function nestedFolders(nodeId, folderList = []) {
     }
 }
 
+async function uploadAlf(parentId, file, filename) {
+    try {
+        var form = new FormData()
+        form.append('filedata', file, filename);
+
+        await axios({
+            method: 'POST',
+            url: `${process.env.ALF_BASE_API}alfresco/versions/1/nodes/${parentId}/children`,
+            data: form,
+            headers: form.getHeaders(),
+        });
+    } catch (error) {
+        console.log(`ERROR at uploadAlf(${parentId}, file, ${filename}): `, error);
+    }
+}
+
+async function moveFile(from, to) {
+    try {
+
+    } catch (error) {
+        console.log(`ERROR at moveFile(${from}, ${to}): `, error);
+    }
+}
+
 async function main() {
     try {
-        let pdf_files = await fs.readdir(`${process.env.STORAGE_PATH}PDF`)
-        console.log(pdf_files);
-        let csv_files = await fs.readdir(`${process.env.STORAGE_PATH}CSV`)
-        console.log(csv_files);
+        const pdf_filenames = await fs.readdir(`${process.env.STORAGE_PATH}PDF`)
+        const csv_filenames = await fs.readdir(`${process.env.STORAGE_PATH}CSV`)
+
+        for await (const name of pdf_filenames) {
+            const pdf_file = await fs.readFile(`${process.env.STORAGE_PATH}PDF/${name}`)
+
+            if (pdf_file) {
+                const csv_filtered = csv_filenames.filter(c => c.replace(".csv", "") === name.replace(".pdf", ""))
+                if (csv_filtered[0]) {
+                    const workbook = XLSX.readFile(`${process.env.STORAGE_PATH}CSV/${csv_filtered[0]}`);
+                    const sheet_name_list = workbook.SheetNames;
+                    const xlData = XLSX.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
+
+                    const hash = await md5File(`${process.env.STORAGE_PATH}PDF/${name}`)
+
+                    if (hash === xlData[0]['MD5 Code']) {
+                        let cloneXlData = { ...xlData[0] }
+                        delete cloneXlData.Filename
+                        delete cloneXlData['Date Time']
+                        delete cloneXlData['MD5 Code']
+                        const folderList = Object.values(cloneXlData)
+                        console.log(folderList);
+
+                        const folderId = await nestedFolders(process.env.ALF_BASE_NODE, folderList);
+                        await uploadAlf(folderId, pdf_file, name);
+                    } else {
+                    }
+                } else {
+
+                }
+            }
+        }
 
     } catch (error) {
         console.log("ERROR at main(): ", error);

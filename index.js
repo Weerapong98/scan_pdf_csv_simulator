@@ -71,13 +71,12 @@ async function uploadAlf(parentId, file, filename) {
     try {
         var form = new FormData()
         form.append('filedata', file, filename);
-        form.append('destination', `workspace://SpacesStore/${parentId}`)
-        form.append('overwrite', 'true')
 
-        await axios({
+        return axios({
             method: 'POST',
-            url: `${process.env.ALF_BASE_SERVICE}api/upload`,
+            url: `${process.env.ALF_BASE_API}alfresco/versions/1/nodes/${parentId}/children`,
             data: form,
+            params: { include: "path", autoRename: true },
             headers: form.getHeaders(),
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
@@ -100,10 +99,27 @@ async function moveFile(from, to) {
     }
 }
 
+async function saveLog(path, name, text) {
+    try {
+        await fs.writeFile(
+            `${path}/${name}.log`,
+            text,
+            { flag: 'a' },
+            (error) => {
+                throw error
+            },
+        )
+    } catch (error) {
+        console.log(`ERROR at saveLog(${path}, ${name}, text): `, error);
+    }
+}
+
 async function main() {
     try {
         const pdf_filenames = await fs.readdir(`${process.env.STORAGE_PATH}PDF`)
         const csv_filenames = await fs.readdir(`${process.env.STORAGE_PATH}CSV`)
+
+        const timestamp = new Date().toISOString()
 
         for await (const name of pdf_filenames) {
             const pdf_file = await fs.readFile(`${process.env.STORAGE_PATH}PDF/${name}`)
@@ -123,17 +139,18 @@ async function main() {
                         delete cloneXlData['Date Time']
                         delete cloneXlData['MD5 Code']
                         const folderList = Object.values(cloneXlData)
-
                         const folderId = await nestedFolders(process.env.ALF_BASE_NODE, folderList);
-                        await uploadAlf(folderId, pdf_file, name);
 
+                        const uploadRes = await uploadAlf(folderId, pdf_file, name);
+
+                        await saveLog("logs/SUCCESS", timestamp.split('T')[0], `[${timestamp}]: ${name}\n\tid: ${uploadRes.data.entry.id}\n\tpath: ${uploadRes.data.entry.path.name}/${name}\n\n`)
                         await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/SUCCESS/${name}`)
                     } else {
-                        console.log(`File MD5 hash does not match for: ${name}`);
+                        await saveLog("logs/ERROR", timestamp.split('T')[0], `[${timestamp}]: ${name}\n\tmessage: File MD5 hash does not match for "${name}"\n\n`)
                         await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/ERROR/${name}`)
                     }
                 } else {
-                    console.log(`No matching CSV file for PDF: ${name}`);
+                    await saveLog("logs/ERROR", timestamp.split('T')[0], `[${timestamp}]: ${name}\n\tmessage: No matching CSV file for PDF "${name}"\n\n`)
                     await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/ERROR/${name}`)
                 }
             }

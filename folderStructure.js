@@ -81,7 +81,6 @@ async function main() {
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Sheet1'], { header: 1 });
         for await (const row of rows) {
             await nestedFolders(process.env.ALF_MATRIX_NODE, row.map(r => formatName(r.toString())).filter(r => r));
-
         }
     } catch (error) {
         console.log(`ERROR at main(): `, error);

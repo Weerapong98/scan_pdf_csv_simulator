@@ -65,12 +65,23 @@ async function nestedFolders(nodeId, folderList = []) {
     }
 }
 
+function formatName(name) {
+    if (name.includes("/")) {
+        name = name.split("/").join("-")
+    }
+    if (name.includes("|")) {
+        name = name.split("|").join("-")
+    }
+    return name
+}
+
 async function main() {
     try {
         const workbook = XLSX.readFile("assets/FolderStructure.xlsx")
-        const csvData = XLSX.utils.sheet_to_csv(workbook.Sheets['Sheet1']);
-        for await (const row of csvData.split("\n")) {
-            await nestedFolders(process.env.ALF_MATRIX_NODE, row.split(",").filter(el => el));
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Sheet1'], { header: 1 });
+        for await (const row of rows) {
+            await nestedFolders(process.env.ALF_MATRIX_NODE, row.map(r => formatName(r.toString())).filter(r => r));
+
         }
     } catch (error) {
         console.log(`ERROR at main(): `, error);

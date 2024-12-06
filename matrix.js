@@ -2,7 +2,6 @@ require('dotenv').config()
 const { promises: fs } = require('fs')
 const axios = require('axios')
 const XLSX = require("xlsx");
-const { log } = require('console');
 
 const auth = {
     username: process.env.ALF_USERNAME,

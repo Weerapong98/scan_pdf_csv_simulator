@@ -68,7 +68,7 @@ async function nestedFolders(nodeId, folderList = []) {
 
 async function main() {
     try {
-        const workbook = XLSX.readFile("assets/EXAT-Document Matrix.xlsx")
+        const workbook = XLSX.readFile("assets/FolderStructure.xlsx")
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets['Matrix']);
         for await (const item of jsonData) {
             let xlsxData = { ...item }

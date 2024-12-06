@@ -67,22 +67,10 @@ async function nestedFolders(nodeId, folderList = []) {
 
 async function main() {
     try {
-        const workbook = XLSX.readFile("assets/EXAT-Document Matrix.xlsx")
-        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets['Matrix']);
-        for await (const item of jsonData) {
-            let xlsxData = { ...item }
-            delete xlsxData['Custom Metadata']
-            const folderList = Object.values(xlsxData).map(folder => {
-                folder = folder.toString()
-                if (folder.includes("/")) {
-                    folder = folder.split("/").join("-")
-                }
-                if (folder.endsWith(".")) {
-                    folder = folder.slice(0, -1)
-                }
-                return folder
-            })
-            await nestedFolders(process.env.ALF_MATRIX_NODE, folderList);
+        const workbook = XLSX.readFile("assets/FolderStructure.xlsx")
+        const csvData = XLSX.utils.sheet_to_csv(workbook.Sheets['Sheet1']);
+        for await (const row of csvData.split("\n")) {
+            await nestedFolders(process.env.ALF_MATRIX_NODE, row.split(",").filter(el => el));
         }
     } catch (error) {
         console.log(`ERROR at main(): `, error);

@@ -10,6 +10,15 @@ const auth = {
     password: process.env.ALF_PASSWORD
 }
 
+const aspectName = "pdf:scanned_pdf"
+const aspectForm = {
+    "pdf:approver_name": "",
+    "pdf:doc_owner_dep": "",
+    "pdf:scanned_date": null,
+    "pdf:status": "",
+    "pdf:note": "",
+}
+
 async function nestedFolders(nodeId, folderList = []) {
     try {
         var folderId = nodeId
@@ -87,6 +96,32 @@ async function uploadAlf(parentId, file, filename) {
     }
 }
 
+async function addAspect(nodeId, aspectName, properties = {}) {
+    try {
+        // 1. get node with aspects and properties
+        const nodeRes = await axios({
+            method: 'GET',
+            url: `${process.env.ALF_BASE_API}alfresco/versions/1/nodes/${nodeId}`,
+            params: { include: "aspectNames,properties" },
+            auth
+        })
+        const aspectNames = [...new Set([...nodeRes.data.entry.aspectNames, aspectName].filter(el => el))]
+
+        return axios({
+            method: 'PUT',
+            url: `${process.env.ALF_BASE_API}alfresco/versions/1/nodes/${nodeId}`,
+            params: { include: "aspectNames,properties" },
+            data: {
+                aspectNames,
+                properties
+            },
+            auth
+        })
+    } catch (error) {
+        console.log(`ERROR at addAspect(${nodeId}, ${aspectName}, ${JSON.stringify(aspectProp)}): `, error);
+    }
+}
+
 async function moveFile(from, to) {
     try {
         await fs.rename(from, to, (error) => {
@@ -138,10 +173,17 @@ async function main() {
                         delete cloneXlData.Filename
                         delete cloneXlData['Date Time']
                         delete cloneXlData['MD5 Code']
+
+                        // remove Department and Document_Path
+                        delete cloneXlData.Department
+                        delete cloneXlData.Document_Path
+
                         const folderList = Object.values(cloneXlData)
                         const folderId = await nestedFolders(process.env.ALF_BASE_NODE, folderList);
 
                         const uploadRes = await uploadAlf(folderId, pdf_file, name);
+
+                        await addAspect(uploadRes.data.entry.id, aspectName, aspectForm)
 
                         await saveLog("logs/SUCCESS", timestamp.split('T')[0], `[${timestamp}]: ${name}\n\tid: ${uploadRes.data.entry.id}\n\tpath: ${uploadRes.data.entry.path.name}/${name}\n\n`)
                         await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/SUCCESS/${name}`)

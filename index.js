@@ -4,6 +4,7 @@ const axios = require('axios')
 const FormData = require('form-data')
 const XLSX = require("xlsx");
 const md5File = require('md5-file')
+const pdfParse = require('pdf-parse');
 
 const auth = {
     username: process.env.ALF_USERNAME,
@@ -178,12 +179,15 @@ async function main() {
                         delete cloneXlData.Department
                         delete cloneXlData.Document_Path
 
+                        // get pdf data
+                        const pdfData = await pdfParse(pdf_file);
+
                         const folderList = Object.values(cloneXlData)
                         const folderId = await nestedFolders(process.env.ALF_BASE_NODE, folderList);
 
                         const uploadRes = await uploadAlf(folderId, pdf_file, name);
 
-                        await addAspect(uploadRes.data.entry.id, aspectName, aspectForm)
+                        await addAspect(uploadRes.data.entry.id, aspectName, { ...aspectForm, "pdf:numpages": pdfData.numpages })
 
                         await saveLog("logs/SUCCESS", timestamp.split('T')[0], `[${timestamp}]: ${name}\n\tid: ${uploadRes.data.entry.id}\n\tpath: ${uploadRes.data.entry.path.name}/${name}\n\n`)
                         await moveFile(`${process.env.STORAGE_PATH}PDF/${name}`, `${process.env.STORAGE_PATH}RESULT/SUCCESS/${name}`)
